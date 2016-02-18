@@ -1,7 +1,10 @@
 package ca.albertlockett.Tetris;
 
+import java.awt.RenderingHints.Key;
 import java.io.IOException;
+import java.util.List;
 
+import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.Screen;
@@ -13,6 +16,8 @@ import ca.albertlockett.Tetris.shape.util.CollisionException;
 import ca.albertlockett.Tetris.shape.util.ShapeDrawer;
 import ca.albertlockett.Tetris.shape.util.ShapeFactory;
 import ca.albertlockett.Tetris.shapes.Shape;
+import ca.albertlockett.Tetris.thread.BrickDropper;
+import ca.albertlockett.Tetris.thread.KeyInputThread;
 
 public class GameScreen {
 
@@ -20,121 +25,125 @@ public class GameScreen {
 	public static void main(String[] args) throws IOException, 
 			InterruptedException, CollisionException {
 		
+		// create game screen
 		Terminal terminal = new DefaultTerminalFactory().createTerminal();
 		Screen screen = new TerminalScreen(terminal);
 	    screen.startScreen();
-	
+	    TerminalSize gameSize = screen.getTerminalSize();
+	    
+	    // initialize game state variables
+	    boolean gameOver = false;
+	    int fpsDelay = 1000 / 60;  // 60 FPS
+	    int brickDropDelay = 1000; // 1s at level 1
+	    
+	    // offset for shape
+	    int xOffset = gameSize.getColumns() / 2;
+	    int yOffset = 0;
+	    
+	    // initialize shape utilities
 	    ShapeFactory shapeFactory = new ShapeFactory();
 	    ShapeDrawer drawer = new ShapeDrawer();
-	    
-	    int xOffset = 5;
-	    int yOffset = 5;
-	    
 	    Shape shape = shapeFactory.getRandomShape();
-	    drawer.drawShape(shape, screen, xOffset, yOffset);
-	    screen.refresh();
 	    
-	    while(true) {
-	    	KeyStroke key = screen.pollInput();
-	    	if(key != null) {
+	    // draw shape to start game
+	    drawer.drawShape(shape, screen, xOffset, yOffset);
+	    
+	    // start brick move treads
+	    BrickDropper brickDropTimer = new BrickDropper();
+	    brickDropTimer.setDelay(brickDropDelay);
+	    brickDropTimer.start();
+	    
+	    // start key input thread
+	    KeyInputThread keyInput = new KeyInputThread((TerminalScreen) screen);
+	    keyInput.start();
+	    
+	    while(!gameOver) {
+	    	Thread.sleep(fpsDelay);
+	    	
+	    	boolean nextShape = false;
+	    	
+	    	// check if there's been some keyboard input
+	    	List<KeyStroke> keyStrokes = keyInput.getKeyStrokes();
+	    	for(KeyStroke key : keyStrokes) {
 	    		
+	    		// drop
+	    		if(new Character(' ').equals(key.getCharacter())) {
+	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    			while(drawer.canDropShape(screen, shape, xOffset, yOffset)){
+	    				yOffset++;
+	    			}
+	    			drawer.drawShape(shape, screen, xOffset, yOffset);
+	    			nextShape = true;
+	    		}
+	    		
+	    		// down
+	    		if(key.getKeyType().equals(KeyType.ArrowDown)) {
+	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    			if(drawer.canDropShape(screen, shape, xOffset, yOffset)) {
+	    				yOffset++;
+	    			}
+	    			drawer.drawShape(shape, screen, xOffset, yOffset);
+	    			continue;
+	    		}
+	    		
+	    		// left
 	    		if(key.getKeyType().equals(KeyType.ArrowLeft)) {
 	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    			if(drawer.canDrawAtPosition(screen, shape, xOffset - 1,
-	    					yOffset)) {
+	    			if(drawer.canGoLeft(screen, shape, xOffset, yOffset)) {
 	    				xOffset--;
 	    			}
 	    			drawer.drawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    		} else if(key.getKeyType().equals(KeyType.ArrowRight)) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    			if(drawer.canDrawAtPosition(screen, shape, xOffset + 1, 
-	    					yOffset)) {
-	    				xOffset++;
-	    			}
-    				drawer.drawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    		} else if(key.getKeyType().equals(KeyType.ArrowDown)) {
-    				drawer.undrawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    			if(drawer.canDrawAtPosition(screen, shape, xOffset, 
-	    					yOffset + 1)) {
-	    				yOffset++;
-	    			}
-    				drawer.drawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    		} else if(key.getKeyType().equals(KeyType.ArrowUp)) {
-    				drawer.undrawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    			if(drawer.canDrawAtPosition(screen, shape, xOffset, 
-	    					yOffset - 1)) {
-	    				yOffset--;
-	    			}
-    				drawer.drawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    		} else if(key.getCharacter().equals('z')) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-    				shape.rotateLeft();
-    				drawer.drawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    		} else if(key.getCharacter().equals('x')) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-    				shape.rotateRight();
-    				drawer.drawShape(shape, screen, xOffset, yOffset);
-    				screen.refresh();
-	    		} else if(key.getKeyType().equals(KeyType.Enter)) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			xOffset = 5;
-    			    yOffset = 5;    
-    			    shape = shapeFactory.getRandomShape();
-    			    drawer.drawShape(shape, screen, xOffset, yOffset);
-    			    screen.refresh();
+	    			continue;
 	    		}
 	    		
-	    		System.out.println(key);
+	    		// right
+	    		if(key.getKeyType().equals(KeyType.ArrowRight)) {
+	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    			if(drawer.canGoRight(screen, shape, xOffset, yOffset)) {
+	    				xOffset++;
+	    			}
+	    			drawer.drawShape(shape, screen, xOffset, yOffset);
+	    			continue;
+	    		}
+	    		
+	    		// rotate left
+	    		if(new Character('z').equals(key.getCharacter())) {
+	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    			if(drawer.canRotateLeft(screen, shape, xOffset, yOffset)) {
+	    				shape.rotateLeft();
+	    			}
+	    			drawer.drawShape(shape, screen, xOffset, yOffset);
+	    			continue;
+	    		}
+	    		
+	    		// rotate right
+	    		if(new Character('x').equals(key.getCharacter())) {
+	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    			if(drawer.canRotateRight(screen, shape, xOffset, yOffset)) {
+	    				shape.rotateRight();
+	    			}
+	    			drawer.drawShape(shape, screen, xOffset, yOffset);
+	    			continue;
+	    		}
 	    	}
-	    	Thread.sleep(20);
-	    }
-	    
-	    
-	    
-	    /* == this works OK
-	    while(true) {
 	    	
-	    	Shape shape = shapeFactory.getRandomShape();
+	    	if(brickDropTimer.getDropBrick()) {
+	    		drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    		if(drawer.canDropShape(screen, shape, xOffset, yOffset)){
+	    			yOffset++;
+	    		} else {
+	    			nextShape = true;
+	    		}
+	    		drawer.drawShape(shape, screen, xOffset, yOffset);
+	    	}
 	    	
-		    int xOffset = 10;
-		    int yOffset = 1;
-		    int delay = 200;
-		    
-		    while (drawer.canDrawAtPosition(screen, shape, xOffset, yOffset)) {
-
-		    	drawer.drawShape(shape, screen, xOffset, yOffset);
-			    screen.refresh();
-			    
-			    // wait
-			    Thread.sleep(delay);
-			    
-			    // undraw
-			    drawer.undrawShape(shape, screen, xOffset, yOffset);
-			    screen.refresh();
-			    
-			    if(!drawer.canDrawAtPosition(screen,shape,xOffset,yOffset+1)) {
-			    	drawer.drawShape(shape, screen, xOffset, yOffset);
-			    }
-				    
-			    // increment
-			    yOffset++;
-		    
-			    
-		    }
+	    	// if time for next shape
+	    	if(nextShape) {
+	    		xOffset = gameSize.getColumns() / 2;
+	    	    yOffset = 0;
+	    	    shape = shapeFactory.getRandomShape();
+	    	}
 	    }
-	    */
-	    
 	    
 	}
 	
