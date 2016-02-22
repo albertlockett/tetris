@@ -1,10 +1,10 @@
 package ca.albertlockett.Tetris;
 
-import java.awt.RenderingHints.Key;
 import java.io.IOException;
 import java.util.List;
 
 import com.googlecode.lanterna.TerminalSize;
+import com.googlecode.lanterna.TextCharacter;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.Screen;
@@ -21,31 +21,45 @@ import ca.albertlockett.Tetris.thread.KeyInputThread;
 
 public class GameScreen {
 
+	private int fpsDelay = 1000 / 60;
+	private int brickDropDelay = 1000;
+	private Screen screen;
+	private ShapeFactory shapeFactory;
+	private ShapeDrawer drawer;
+	private Shape shape;
+	private int xOffset;
+	private int yOffset;
 	
-	public static void main(String[] args) throws IOException, 
-			InterruptedException, CollisionException {
-		
+	public GameScreen() throws IOException {
 		// create game screen
 		Terminal terminal = new DefaultTerminalFactory().createTerminal();
-		Screen screen = new TerminalScreen(terminal);
-	    screen.startScreen();
-	    TerminalSize gameSize = screen.getTerminalSize();
+		screen = new TerminalScreen(terminal);
+		
+		
+		// initialize shape utilities
+		shapeFactory = new ShapeFactory();
+		drawer = new ShapeDrawer();
+	    shape = shapeFactory.getRandomShape();
+	    
+	}
+	
+	
+	public void run() throws IOException, 
+			InterruptedException, CollisionException {
+		
+		// start game screen
+		screen.startScreen();
+		
+		TerminalSize gameSize = screen.getTerminalSize();
+		xOffset = gameSize.getColumns() / 4;
+	    yOffset = 0;
 	    
 	    // initialize game state variables
 	    boolean gameOver = false;
-	    int fpsDelay = 1000 / 60;  // 60 FPS
-	    int brickDropDelay = 1000; // 1s at level 1
 	    
-	    // offset for shape
-	    int xOffset = gameSize.getColumns() / 2;
-	    int yOffset = 0;
 	    
-	    // initialize shape utilities
-	    ShapeFactory shapeFactory = new ShapeFactory();
-	    ShapeDrawer drawer = new ShapeDrawer();
-	    Shape shape = shapeFactory.getRandomShape();
-	    
-	    // draw shape to start game
+	    // draw background and draw shape to start game
+	    drawer.fillBackground(screen);
 	    drawer.drawShape(shape, screen, xOffset, yOffset);
 	    
 	    // start brick move treads
@@ -57,77 +71,31 @@ public class GameScreen {
 	    KeyInputThread keyInput = new KeyInputThread((TerminalScreen) screen);
 	    keyInput.start();
 	    
+	    
+	    System.out.println("starting game: xO=" + xOffset + " yO=" + yOffset);
+	    
+	    // run game loop
 	    while(!gameOver) {
-	    	Thread.sleep(fpsDelay);
+	    	Thread.sleep(fpsDelay); // delay
 	    	
 	    	boolean nextShape = false;
 	    	
 	    	// check if there's been some keyboard input
 	    	List<KeyStroke> keyStrokes = keyInput.getKeyStrokes();
 	    	for(KeyStroke key : keyStrokes) {
-	    		
-	    		// drop
-	    		if(new Character(' ').equals(key.getCharacter())) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			while(drawer.canDropShape(screen, shape, xOffset, yOffset)){
-	    				yOffset++;
-	    			}
-	    			drawer.drawShape(shape, screen, xOffset, yOffset);
+
+				drawer.undrawShape(shape, screen, xOffset, yOffset);
+	    		processKeyInput(key);
+	    		System.out.println("move: xO=" + xOffset + " yO=" + yOffset);
+	    		if(!drawer.canDropShape(screen, shape, xOffset, yOffset)) {
 	    			nextShape = true;
 	    		}
-	    		
-	    		// down
-	    		if(key.getKeyType().equals(KeyType.ArrowDown)) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			if(drawer.canDropShape(screen, shape, xOffset, yOffset)) {
-	    				yOffset++;
-	    			}
-	    			drawer.drawShape(shape, screen, xOffset, yOffset);
-	    			continue;
-	    		}
-	    		
-	    		// left
-	    		if(key.getKeyType().equals(KeyType.ArrowLeft)) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			if(drawer.canGoLeft(screen, shape, xOffset, yOffset)) {
-	    				xOffset--;
-	    			}
-	    			drawer.drawShape(shape, screen, xOffset, yOffset);
-	    			continue;
-	    		}
-	    		
-	    		// right
-	    		if(key.getKeyType().equals(KeyType.ArrowRight)) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			if(drawer.canGoRight(screen, shape, xOffset, yOffset)) {
-	    				xOffset++;
-	    			}
-	    			drawer.drawShape(shape, screen, xOffset, yOffset);
-	    			continue;
-	    		}
-	    		
-	    		// rotate left
-	    		if(new Character('z').equals(key.getCharacter())) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			if(drawer.canRotateLeft(screen, shape, xOffset, yOffset)) {
-	    				shape.rotateLeft();
-	    			}
-	    			drawer.drawShape(shape, screen, xOffset, yOffset);
-	    			continue;
-	    		}
-	    		
-	    		// rotate right
-	    		if(new Character('x').equals(key.getCharacter())) {
-	    			drawer.undrawShape(shape, screen, xOffset, yOffset);
-	    			if(drawer.canRotateRight(screen, shape, xOffset, yOffset)) {
-	    				shape.rotateRight();
-	    			}
-	    			drawer.drawShape(shape, screen, xOffset, yOffset);
-	    			continue;
-	    		}
+	    		drawer.drawShape(shape, screen, xOffset, yOffset);
 	    	}
 	    	
+	    	// check if time to drop brick
 	    	if(brickDropTimer.getDropBrick()) {
+	    		System.out.println("drop: xO=" + xOffset + " yO=" + yOffset);
 	    		drawer.undrawShape(shape, screen, xOffset, yOffset);
 	    		if(drawer.canDropShape(screen, shape, xOffset, yOffset)){
 	    			yOffset++;
@@ -137,14 +105,67 @@ public class GameScreen {
 	    		drawer.drawShape(shape, screen, xOffset, yOffset);
 	    	}
 	    	
-	    	// if time for next shape
+	    	// if ready for next shape
 	    	if(nextShape) {
-	    		xOffset = gameSize.getColumns() / 2;
+	    		xOffset = gameSize.getColumns() / 4;
 	    	    yOffset = 0;
 	    	    shape = shapeFactory.getRandomShape();
 	    	}
 	    }
 	    
 	}
+	
+	
+	private void processKeyInput(KeyStroke key) throws CollisionException,
+			IOException {
+		// drop
+		if(new Character(' ').equals(key.getCharacter())) {
+			while(drawer.canDropShape(screen, shape, xOffset, yOffset)){
+				yOffset++;
+			}
+			
+		}
+		
+		// down
+		if(key.getKeyType().equals(KeyType.ArrowDown)) {
+			if(drawer.canDropShape(screen, shape, xOffset, yOffset)) {
+				yOffset++;
+			}
+			return;
+		}
+		
+		// left
+		if(key.getKeyType().equals(KeyType.ArrowLeft)) {
+			if(drawer.canGoLeft(screen, shape, xOffset, yOffset)) {
+				xOffset--;
+			}
+			return;
+		}
+		
+		// right
+		if(key.getKeyType().equals(KeyType.ArrowRight)) {
+			if(drawer.canGoRight(screen, shape, xOffset, yOffset)) {
+				xOffset++;
+			}
+			return;
+		}
+		
+		// rotate left
+		if(new Character('z').equals(key.getCharacter())) {
+			if(drawer.canRotateLeft(screen, shape, xOffset, yOffset)) {
+				shape.rotateLeft();
+			}
+			return;
+		}
+		
+		// rotate right
+		if(new Character('x').equals(key.getCharacter())) {
+			if(drawer.canRotateRight(screen, shape, xOffset, yOffset)) {
+				shape.rotateRight();
+			}
+			return;
+		}
+	}
+	
 	
 }
