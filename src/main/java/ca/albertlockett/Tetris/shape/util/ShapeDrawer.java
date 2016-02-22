@@ -1,8 +1,6 @@
 package ca.albertlockett.Tetris.shape.util;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import com.googlecode.lanterna.SGR;
 import com.googlecode.lanterna.TerminalSize;
@@ -10,11 +8,13 @@ import com.googlecode.lanterna.TextCharacter;
 import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.screen.Screen;
 
+import ca.albertlockett.Tetris.ScreenUtil;
 import ca.albertlockett.Tetris.shapes.Shape;
 import ca.albertlockett.Tetris.shapes.SquareCoordinate;
 
 public class ShapeDrawer {
-
+	
+	// TODO: Define these globally so they're not hard coded in 2 places
 	private TextColor bgColor1 = new TextColor.RGB(0, 0, 0);
 	private TextColor bgColor2 = new TextColor.RGB(50, 50, 50);
 	
@@ -46,34 +46,14 @@ public class ShapeDrawer {
 			}
 			
 			// check if there's already a block there
-			List<TextCharacter> textChars = new ArrayList<>();
-			textChars.add(screen.getFrontCharacter(xCoord, yCoord));
-			textChars.add(screen.getBackCharacter(xCoord, yCoord));
-			textChars.add(screen.getFrontCharacter(xCoord + 1, yCoord));
-			textChars.add(screen.getBackCharacter(xCoord + 1, yCoord));
+			if(ScreenUtil.isBlockAtLocation(screen, xCoord, yCoord)) {
+				System.err.println("Block located at:"+xCoord+","+yCoord);
+				return false;
+			}
 			
-			for(TextCharacter textChar : textChars) {
-				
-				if(textChar == null) {
-					System.err.println("null text char");
-					continue;
-				}
-				
-				
-				TextColor fgColor = textChar.getForegroundColor();
-				TextColor bgColor = textChar.getBackgroundColor();
-				
-				// check foreground color
-				if(!fgColor.equals(bgColor1) && !fgColor.equals(bgColor2)) {
-					System.err.println("fg Block collision detected");
-					return false;
-				}
-				
-				// check background color
-				if( !bgColor.equals(bgColor1) && !bgColor.equals(bgColor2)) {
-					System.err.println("bg Block collision detected");
-					return false;
-				}
+			if(ScreenUtil.isBlockAtLocation(screen, xCoord + 1, yCoord)) {
+				System.err.println("Block located at:"+xCoord+","+yCoord);
+				return false;
 			}
 		}
 		
@@ -192,8 +172,18 @@ public class ShapeDrawer {
 			}
 			screen.refresh();
 		}
-		
-		
+	}
+	
+	
+	public void removeRow(Screen screen, int row) {
+		TerminalSize gameSize = screen.getTerminalSize();
+		for(int currentRow = row; row > 0; row--) {
+			for(int col = 0; col < gameSize.getColumns(); col++) {
+				TextCharacter textChar = screen
+						.getFrontCharacter(currentRow - 1, col);
+				screen.setCharacter(row, col, textChar);
+			}
+		}
 	}
 	
 }

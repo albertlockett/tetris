@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.List;
 
 import com.googlecode.lanterna.TerminalSize;
-import com.googlecode.lanterna.TextCharacter;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.Screen;
@@ -34,7 +33,6 @@ public class GameScreen {
 		// create game screen
 		Terminal terminal = new DefaultTerminalFactory().createTerminal();
 		screen = new TerminalScreen(terminal);
-		
 		
 		// initialize shape utilities
 		shapeFactory = new ShapeFactory();
@@ -79,11 +77,11 @@ public class GameScreen {
 	    	Thread.sleep(fpsDelay); // delay
 	    	
 	    	boolean nextShape = false;
+	    	boolean shapeMoved = false;
 	    	
 	    	// check if there's been some keyboard input
 	    	List<KeyStroke> keyStrokes = keyInput.getKeyStrokes();
 	    	for(KeyStroke key : keyStrokes) {
-
 				drawer.undrawShape(shape, screen, xOffset, yOffset);
 	    		processKeyInput(key);
 	    		System.out.println("move: xO=" + xOffset + " yO=" + yOffset);
@@ -91,6 +89,7 @@ public class GameScreen {
 	    			nextShape = true;
 	    		}
 	    		drawer.drawShape(shape, screen, xOffset, yOffset);
+	    		shapeMoved = true;
 	    	}
 	    	
 	    	// check if time to drop brick
@@ -103,6 +102,7 @@ public class GameScreen {
 	    			nextShape = true;
 	    		}
 	    		drawer.drawShape(shape, screen, xOffset, yOffset);
+	    		shapeMoved = true;
 	    	}
 	    	
 	    	// if ready for next shape
@@ -110,6 +110,10 @@ public class GameScreen {
 	    		xOffset = gameSize.getColumns() / 4;
 	    	    yOffset = 0;
 	    	    shape = shapeFactory.getRandomShape();
+	    	}
+	    	
+	    	if(shapeMoved) {
+	    		processCompletedRows();
 	    	}
 	    }
 	    
@@ -167,5 +171,16 @@ public class GameScreen {
 		}
 	}
 	
+	
+	public void processCompletedRows() {
+		TerminalSize gameSize = screen.getTerminalSize();
+		for(int row = 0; row < gameSize.getRows(); row++) {
+			if(ScreenUtil.isRowComplete(screen, row)) {
+				
+				System.out.println("found completed row");
+				drawer.removeRow(screen, row);
+			}
+		}
+	}
 	
 }

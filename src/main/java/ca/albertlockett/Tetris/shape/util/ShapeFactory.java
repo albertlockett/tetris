@@ -16,6 +16,9 @@ public class ShapeFactory {
 	public Shape getRandomShape() {
 		Random random = new Random();
 
+		return new Line();
+		
+		/*
 		int shape = random.nextInt(7);
 		switch(shape) {
 			case 0:
@@ -33,6 +36,7 @@ public class ShapeFactory {
 			default:
 				return new Line();
 		}		
+		*/
 	}
 	
 }
